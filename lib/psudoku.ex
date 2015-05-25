@@ -1,7 +1,9 @@
-defmodule Sudoku do
-  def easy, do: Sudoku.solve(Sudoku.easy_board)
-  def hardish, do: Sudoku.solve(Sudoku.hardish_board)
-  def hard, do: Sudoku.solve(Sudoku.hard_board)
+# The only board that works with this one on my machine is the easy.
+# The others simply timeout.
+defmodule PSudoku do
+  def easy, do: PSudoku.solve(PSudoku.easy_board)
+  def hardish, do: PSudoku.solve(PSudoku.hardish_board)
+  def hard, do: PSudoku.solve(PSudoku.hard_board)
 
   # Just using 0 rather than nil for display purposes
   def easy_board do
@@ -55,7 +57,7 @@ defmodule Sudoku do
   def solve(board) do
     case solve(board, 0, 0) do
       { :ok, solved_board } -> print_board(solved_board)
-      { :error } -> IO.puts("Board is not valid")
+      { :error } -> IO.puts("ERRRO")
     end
   end
 
@@ -64,22 +66,23 @@ defmodule Sudoku do
 
   def solve(board, x, y) do
     if Enum.at(Enum.at(board, x), y) == 0 do
-      solve(board, x, y, possible_values(board, x, y))
+      vals = possible_values(board, x, y)
+      if length(vals) > 0 do
+        result = Enum.map(vals, fn(v) -> Task.async(fn -> solve(board, x, y, v) end) end)
+        |> Enum.map(&(Task.await(&1, 30_000)))
+        |> Enum.find({ :error }, &match?({ :ok, _ }, &1))
+      else
+        { :error }
+      end
     else
       solve(board, x, y + 1)
     end
   end
 
-  def solve(_, _, _, []), do: { :error }
-
-  def solve(board, x, y, [head | tail]) do
-    new_row = Enum.at(board, x) |> List.replace_at(y, head)
+  def solve(board, x, y, v) when is_integer(v) do
+    new_row = Enum.at(board, x) |> List.replace_at(y, v)
     new_board = List.replace_at(board, x, new_row)
-
-    case solve(new_board, x, y + 1) do
-      { :ok, solved_board } -> { :ok, solved_board }
-      { :error } -> solve(board, x, y, tail)
-    end
+    solve(new_board, x, y + 1)
   end
 
   def possible_values(board, x, y) do
